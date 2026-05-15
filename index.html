@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vanguard Blade & Bolt – Custody Ledger</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body class="bg-zinc-900 text-white min-h-screen">
+
+<header class="bg-black border-b border-zinc-700 p-4 text-xl font-bold">
+  Vanguard Blade & Bolt – Custody Ledger
+</header>
+
+<main class="p-4 space-y-4">
+
+  <!-- Dashboard -->
+  <section class="grid grid-cols-2 gap-4">
+
+    <div class="bg-amber-700 rounded-2xl p-4">
+      <div class="text-sm opacity-80">With Vanguard</div>
+      <div id="withVanguard" class="text-3xl font-bold">0</div>
+    </div>
+
+    <div class="bg-zinc-700 rounded-2xl p-4">
+      <div class="text-sm opacity-80">With Neon Sales</div>
+      <div id="withNeon" class="text-3xl font-bold">0</div>
+    </div>
+
+    <div class="bg-red-700 rounded-2xl p-4">
+      <div class="text-sm opacity-80">Needs Return</div>
+      <div id="needsReturn" class="text-3xl font-bold">0</div>
+    </div>
+
+    <div class="bg-blue-700 rounded-2xl p-4">
+      <div class="text-sm opacity-80">In Transit</div>
+      <div id="inTransit" class="text-3xl font-bold">0</div>
+    </div>
+
+  </section>
+
+  <!-- Search -->
+  <section class="bg-zinc-800 rounded-2xl p-4">
+    <input
+      id="search"
+      type="text"
+      placeholder="Search serial, SKU, job card..."
+      class="w-full rounded-xl bg-zinc-900 border border-zinc-700 p-4"
+    />
+  </section>
+
+  <!-- Items -->
+  <section class="bg-zinc-800 rounded-2xl p-4 overflow-auto">
+
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-zinc-700">
+          <th class="text-left p-2">SKU</th>
+          <th class="text-left p-2">Item</th>
+          <th class="text-left p-2">Serial</th>
+          <th class="text-left p-2">Status</th>
+        </tr>
+      </thead>
+
+      <tbody id="itemsTable"></tbody>
+
+    </table>
+
+  </section>
+
+</main>
+
+<script>
+
+const SUPABASE_URL = "PASTE_YOUR_URL";
+const SUPABASE_ANON_KEY = "PASTE_YOUR_KEY";
+
+const client = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
+async function loadItems() {
+
+  const { data, error } = await client
+    .from("items")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if(error) {
+    console.error(error);
+    return;
+  }
+
+  const table = document.getElementById("itemsTable");
+  table.innerHTML = "";
+
+  let vanguard = 0;
+  let neon = 0;
+
+  data.forEach(item => {
+
+    if(item.status === "VANGUARD") vanguard++;
+    if(item.status === "NEON") neon++;
+
+    table.innerHTML += `
+      <tr class="border-b border-zinc-700">
+        <td class="p-2">${item.sku || ""}</td>
+        <td class="p-2">${item.name || ""}</td>
+        <td class="p-2">${item.serial || ""}</td>
+        <td class="p-2">${item.status || ""}</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("withVanguard").innerText = vanguard;
+  document.getElementById("withNeon").innerText = neon;
+}
+
+client.channel("items-live")
+.on(
+  "postgres_changes",
+  {
+    event: "*",
+    schema: "public",
+    table: "items"
+  },
+  () => {
+    loadItems();
+  }
+)
+.subscribe();
+
+loadItems();
+
+</script>
+
+</body>
+</html>
